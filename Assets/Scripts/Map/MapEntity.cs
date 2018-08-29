@@ -18,6 +18,7 @@ public interface MapConstructable {
 //  マップ上に配置できる
 public interface MapPlacable {
     void Render (Vector3Int offset);
+    void Release ();
 }
 
 public class MapEntity : MapCodable, MapPlacable, MapConstructable {
@@ -25,6 +26,8 @@ public class MapEntity : MapCodable, MapPlacable, MapConstructable {
     virtual public void Construct (Vector3Int globalLocation, string genom) {
     }
     virtual public void Render (Vector3Int offset) {
+    }
+    virtual public void Release () {
     }
 }
 
@@ -73,6 +76,11 @@ public class PMEGround : PlacedMapEntity {
 
         gameObject.transform.position = WorldPosition(offset) * MapRenderer.scale + new Vector3(0f, size.y * 0.5f, 0f);
         gameObject.transform.localScale = size;
+    }
+
+    public override void Release () {
+        base.Release();
+        MapEntityFactory.Destroy(gameObject);
     }
 }
 
