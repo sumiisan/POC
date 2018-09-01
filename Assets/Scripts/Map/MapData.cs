@@ -8,6 +8,7 @@ public class MapData {
 
     public int viewDistance = 64;
     public RectInt currentBorder;
+    Vector3Int lastDrawnCenter = new Vector3Int(0, 0, 0);
 
     public MapData () {
         chunks = new Dictionary<int, MapChunk>();
@@ -48,6 +49,7 @@ public class MapData {
                 if (currentBorder.yMax < renderedArea.yMax) currentBorder.yMax = renderedArea.yMax;
             }
         }
+        lastDrawnCenter = center;
         return currentBorder;
     }
 
@@ -75,12 +77,14 @@ public class MapData {
     public bool RenderIfNeeded (Vector3Int center) {
         RectInt visibleRect = new RectInt(center.x - viewDistance, center.z - viewDistance, viewDistance * 2, viewDistance * 2);
         //Debug.Log("view:" + visibleRect + "  border:" + currentBorder);
-        if (!currentBorder.Contains(visibleRect)) {
-            Debug.Log("EXTEND!");
+
+        if (Vector3Int.Distance(center, lastDrawnCenter) > 16) {
+            //        if (!currentBorder.Contains(visibleRect)) {
             Render(center);
             ReleaseFarChunks(visibleRect);
             return true;
         }
+
         return false;
     }
 }

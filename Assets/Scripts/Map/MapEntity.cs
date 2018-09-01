@@ -6,6 +6,15 @@ public enum MapEntityType {
     ground = 1,
 }
 
+public struct RenderInfo {
+    public Vector3Int globalPosition;
+    public Vector3Int playerPosition;
+    public RenderInfo (Vector3Int globalPosition, Vector3Int playerPositon) {
+        this.globalPosition = globalPosition;
+        this.playerPosition = playerPositon;
+    }
+}
+
 //  マップ上オブジェクトとして保存できる
 public interface MapCodable {
 }
@@ -32,6 +41,8 @@ public class PlacedMapEntity : MapEntity, MapCodable, MapPlacable, MapConstructa
     public float LODScale;
     public PlacedMapEntity[] children = { null, null, null, null };
     public string genom = "";
+
+    protected bool rendering = false;
 
     public FloatSections lodDistance = new FloatSections(
         new float[]{
@@ -66,7 +77,7 @@ public class PlacedMapEntity : MapEntity, MapCodable, MapPlacable, MapConstructa
 }
 
 public class PMEGround : PlacedMapEntity {
-    GameObject gameObject;
+    GameObject groundObject;
 
     public PMEGround (Vector3 position, float LODScale) : base(MapEntityType.ground, position, LODScale) {
 
@@ -89,19 +100,30 @@ public class PMEGround : PlacedMapEntity {
     }
 
     public override void Render (Vector3Int globalLoc, Vector3Int center) {
+        if (rendering) return;
         base.Render(globalLoc, center);
-        Vector3 pos = globalLoc;
+        rendering = true;
+        RenderInfo info = new RenderInfo(globalLoc, center);
+        MapEntityFactory.shared.StartCoroutine(RenderCR(info));
+
+        rendering = false;
+    }
+
+    private IEnumerator RenderCR (RenderInfo info) {
+
+        Vector3 pos = info.globalPosition;
+        Vector3Int center = info.playerPosition;
         float sqrDist = Mathf.Pow(pos.x - center.x, 2f) + Mathf.Pow(pos.z - center.z, 2f);
         int desiredLODScale = (int)Mathf.Pow(2f, lodDistance.Index(sqrDist));
 
         //        Render(offset, desiredLODScale);
         if (LODScale <= desiredLODScale) {
-            if (gameObject == null) {
-                gameObject = MapEntityFactory.Instantiate(MapEntityFactory.shared.groundPrefab);
+            if (groundObject == null) {
+                groundObject = MapEntityFactory.Instantiate(MapEntityFactory.shared.groundPrefab);
             }
             float LODOffset = LODScale * 0.5f;
-            gameObject.transform.position = new Vector3(globalLoc.x + LODOffset, size.y * 0.5f, globalLoc.z + LODOffset) * MapRenderer.scale;
-            gameObject.transform.localScale = new Vector3(size.x * LODScale, size.y, size.z * LODScale);
+            groundObject.transform.position = new Vector3(pos.x + LODOffset, size.y * 0.5f, pos.z + LODOffset) * MapRenderer.scale;
+            groundObject.transform.localScale = new Vector3(size.x * LODScale, size.y, size.z * LODScale);
 
             for (int i = 0; i < 4; ++i) {
                 PlacedMapEntity child = children[i];
@@ -110,7 +132,7 @@ public class PMEGround : PlacedMapEntity {
                 }
             }
         } else {
-            if (gameObject) {
+            if (groundObject) {
                 ClearGameObject();
             }
             for (int z = 0; z < 2; ++z) {
@@ -118,17 +140,17 @@ public class PMEGround : PlacedMapEntity {
                     PlacedMapEntity child = children[z * 2 + x];
                     if (child != null) {
                         int childLODScale = (int)LODScale / 2;
-                        child.Render(globalLoc + new Vector3Int(x * childLODScale, 0, z * childLODScale), center);
+                        child.Render(info.globalPosition + new Vector3Int(x * childLODScale, 0, z * childLODScale), center);
                     }
                 }
+                yield return null;
             }
-
         }
     }
 
     public override void ClearGameObject () {
-        if (gameObject) {
-            MapEntityFactory.Destroy(gameObject);
+        if (groundObject) {
+            MapEntityFactory.Destroy(groundObject);
         }
         for (int i = 0; i < 4; ++i) {
             if (children[i] != null) children[i].ClearGameObject();
@@ -140,7 +162,7 @@ public class PMEGround : PlacedMapEntity {
         for (int i = 0; i < 4; ++i) {
             if (children[i] != null) children[i].Release();
         }
-        MapEntityFactory.Destroy(gameObject);
+        MapEntityFactory.Destroy(groundObject);
     }
 
 }
