@@ -37,7 +37,7 @@ public class MapData {
         currentBorder = new RectInt(0, 0, 0, 0);
         for (int iz = visibleRect.yMin; iz <= visibleRect.yMax; iz += MapChunk.horizontalSize) {
             for (int ix = visibleRect.xMin; ix <= visibleRect.xMax; ix += MapChunk.horizontalSize) {
-                RectInt renderedArea = Chunk(ChunkLocation(new Vector3Int(ix, 0, iz))).Render();
+                RectInt renderedArea = Chunk(ChunkLocation(new Vector3Int(ix, 0, iz))).Render(center);
 
                 if (currentBorder.size.x == 0) { currentBorder = renderedArea; }  //init
 

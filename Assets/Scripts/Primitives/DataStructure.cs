@@ -7,3 +7,24 @@ public static class DictionaryExtensions {
         return dict.ContainsKey(key) ? dict[key] : default(TValue);
     }
 }
+
+public class FloatSections {
+    public float[] sections;
+
+    public FloatSections (float[] inSections) {
+        sections = inSections;
+    }
+
+    public int length {
+        get {
+            return sections.Length;
+        }
+    }
+
+    public int Index (float value) {
+        for (int i = 0; i < length; ++i) {
+            if (value < sections[i]) return i;
+        }
+        return length;
+    }
+}

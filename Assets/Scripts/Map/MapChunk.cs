@@ -8,10 +8,9 @@ public class MapChunk {
     public static int verticalSize = 256;
 
     public Vector2Int location;
-    public MapEntity[,,] expandedData;
     List<PlacedMapEntity> data;
 
-    bool rendered = false;
+    public bool rendered = false;
 
     public MapChunk (Vector2Int location) {
         this.location = location;
@@ -19,7 +18,7 @@ public class MapChunk {
 
     public void Generate () {
         data = new List<PlacedMapEntity>();
-        GeneratePlane();
+        GeneratePlane(new Vector2Int(0, 0), GlobalLocation());
     }
 
     Vector3Int GlobalLocation (int offsetX = 0, int offsetY = 0, int offsetZ = 0) {
@@ -33,25 +32,38 @@ public class MapChunk {
     }
 
     public bool Intersects (RectInt visibleRect) {
-        Vector3Int gl = GlobalLocation();
         return visibleRect.Intersects(area);
     }
 
-    void GeneratePlane () {
-        for (int iz = 0; iz < horizontalSize; ++iz) {
-            for (int ix = 0; ix < horizontalSize; ++ix) {
-                PlacedMapEntity pme = MapEntityFactory.shared.Generate(MapEntityType.ground, new Vector3Int(ix, 0, iz));
-                pme.Construct(GlobalLocation(ix, 0, iz), "");
-                data.Add(pme);
+    void GeneratePlane (Vector2Int localPos, Vector3Int globalPos, int level = 0, PlacedMapEntity basePME = null) {
+        int LODScale = (int)( horizontalSize / Mathf.Pow(2, level) ); //32/1=32, 32/2=16, 32/4=8, 32/8=4, 32/16=2
+
+        PlacedMapEntity pme = MapEntityFactory.shared.Generate(MapEntityType.ground, new Vector3(localPos.x, 0, localPos.y), LODScale);
+
+        pme.Construct(globalPos, "");
+        if (basePME == null) {
+            data.Add(pme);
+        } else {
+            basePME.children[localPos.y * 2 + localPos.x] = pme;
+        }
+
+        if (level < 5) {
+            for (int z = 0; z < 2; ++z) {
+                for (int x = 0; x < 2; ++x) {
+                    int childLODScale = (int)LODScale / 2;
+                    Vector3Int childGlobalPos = globalPos + new Vector3Int(x * childLODScale, 0, z * childLODScale);
+                    GeneratePlane(new Vector2Int(x, z), childGlobalPos, level + 1, pme);  //  recursive
+                }
             }
+
         }
     }
 
-    public RectInt Render () {
+    public RectInt Render (Vector3Int center) {
         if (!rendered) {
-            rendered = true;
+            //rendered = true;
             foreach (PlacedMapEntity pme in data) {
-                pme.Render(GlobalLocation());
+                pme.Render(GlobalLocation(), center);
             }
         }
         return area;
