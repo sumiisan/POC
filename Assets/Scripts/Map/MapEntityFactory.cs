@@ -11,10 +11,11 @@ public class MapEntityFactory : MonoBehaviour {
         shared = this;
     }
 
-    public PlacedMapEntity Generate (MapEntityType type, Vector3Int mapLocation) {
+    public PlacedMapEntity Generate (MapEntityType type, Vector3 position, int LODScale) {
         switch (type) {
         case MapEntityType.ground:
-            return new PMEGround(mapLocation);
+            return new PMEGround(position, LODScale);
+
         }
         return null;
     }

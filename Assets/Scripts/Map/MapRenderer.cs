@@ -13,6 +13,8 @@ public class MapRenderer : MonoBehaviour {
 
     private void Awake () {
         playerPosition = new Vector3Int(200, 30, 200);
+        OVRPlugin.occlusionMesh = true;
+
     }
     // Use this for initialization
     void Start () {
