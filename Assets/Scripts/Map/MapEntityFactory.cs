@@ -6,6 +6,7 @@ public class MapEntityFactory : MonoBehaviour {
     public static MapEntityFactory shared;
 
     public GameObject groundPrefab;
+    public GameObject oceanPrefab;
 
     private void Awake () {
         shared = this;

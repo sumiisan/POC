@@ -6,7 +6,7 @@ public class MapData {
 
     Dictionary<int, MapChunk> chunks;
 
-    public int viewDistance = 64;
+    public int viewDistance = 128;//64;
     public RectInt currentBorder;
     Vector3Int lastDrawnCenter = new Vector3Int(0, 0, 0);
 
@@ -36,9 +36,12 @@ public class MapData {
     public RectInt Render (Vector3Int center) {
         RectInt visibleRect = new RectInt(center.x - viewDistance, center.z - viewDistance, viewDistance * 2, viewDistance * 2);
         currentBorder = new RectInt(0, 0, 0, 0);
+        MapEntityFactory.shared.StartCoroutine(RenderCR(center));
+
         for (int iz = visibleRect.yMin; iz <= visibleRect.yMax; iz += MapChunk.horizontalSize) {
             for (int ix = visibleRect.xMin; ix <= visibleRect.xMax; ix += MapChunk.horizontalSize) {
-                RectInt renderedArea = Chunk(ChunkLocation(new Vector3Int(ix, 0, iz))).Render(center);
+
+                RectInt renderedArea = Chunk(ChunkLocation(new Vector3Int(ix, 0, iz))).area;
 
                 if (currentBorder.size.x == 0) { currentBorder = renderedArea; }  //init
 
@@ -51,6 +54,17 @@ public class MapData {
         }
         lastDrawnCenter = center;
         return currentBorder;
+
+    }
+
+    private IEnumerator RenderCR (Vector3Int center) {
+        RectInt visibleRect = new RectInt(center.x - viewDistance, center.z - viewDistance, viewDistance * 2, viewDistance * 2);
+        for (int iz = visibleRect.yMin; iz <= visibleRect.yMax; iz += MapChunk.horizontalSize) {
+            for (int ix = visibleRect.xMin; ix <= visibleRect.xMax; ix += MapChunk.horizontalSize) {
+                Chunk(ChunkLocation(new Vector3Int(ix, 0, iz))).Render(center);
+                yield return null;
+            }
+        }
     }
 
     void ReleaseFarChunks (RectInt visibleRect) {
@@ -78,7 +92,7 @@ public class MapData {
         RectInt visibleRect = new RectInt(center.x - viewDistance, center.z - viewDistance, viewDistance * 2, viewDistance * 2);
         //Debug.Log("view:" + visibleRect + "  border:" + currentBorder);
 
-        if (Vector3Int.Distance(center, lastDrawnCenter) > 16) {
+        if (Vector3Int.Distance(center, lastDrawnCenter) > 0.5f) {
             //        if (!currentBorder.Contains(visibleRect)) {
             Render(center);
             ReleaseFarChunks(visibleRect);

@@ -12,9 +12,15 @@ public class MapRenderer : MonoBehaviour {
     public Vector3Int playerPosition;
 
     private void Awake () {
-        playerPosition = new Vector3Int(200, 30, 200);
+        playerPosition = new Vector3Int(10000, 120, 10000);
         OVRPlugin.occlusionMesh = true;
 
+#if UNITY_EDITOR
+        QualitySettings.vSyncCount = 0;  // VSync must be disabled
+        UnityEngine.Application.targetFrameRate = 60;
+#endif
+        OVRManager.tiledMultiResLevel = OVRManager.TiledMultiResLevel.LMSHigh;
+        UnityEngine.XR.XRSettings.eyeTextureResolutionScale = 1.25f;
     }
     // Use this for initialization
     void Start () {

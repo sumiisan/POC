@@ -10,8 +10,6 @@ public class MapChunk {
     public Vector2Int location;
     List<PlacedMapEntity> data;
 
-    public bool rendered = false;
-
     public MapChunk (Vector2Int location) {
         this.location = location;
     }
@@ -25,7 +23,7 @@ public class MapChunk {
         return new Vector3Int(location.x * horizontalSize + offsetX, offsetY, location.y * horizontalSize + offsetZ);
     }
 
-    RectInt area {
+    public RectInt area {
         get {
             return new RectInt(location.x * horizontalSize, location.y * horizontalSize, horizontalSize, horizontalSize);
         }
@@ -59,14 +57,10 @@ public class MapChunk {
         }
     }
 
-    public RectInt Render (Vector3Int center) {
-        if (!rendered) {
-            //rendered = true;
-            foreach (PlacedMapEntity pme in data) {
-                pme.Render(GlobalLocation(), center);
-            }
+    public void Render (Vector3Int center) {
+        foreach (PlacedMapEntity pme in data) {
+            pme.Render(GlobalLocation(), center);
         }
-        return area;
     }
 
     public void Release () {
