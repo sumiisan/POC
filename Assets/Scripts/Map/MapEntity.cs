@@ -22,6 +22,7 @@ public interface MapCodable {
 //  マップ上に生成できる
 public interface MapConstructable {
     void Construct (Vector3Int chunkPosition, string genom);
+    void AverageChildren ();
 }
 
 //  マップ上に配置できる
@@ -68,6 +69,8 @@ public class PlacedMapEntity : MapEntity, MapCodable, MapPlacable, MapConstructa
 
     virtual public void Construct (Vector3Int chunkPosition, string genom) {
     }
+    virtual public void AverageChildren () {
+    }
     virtual public void Render (Vector3Int offset, Vector3Int center) {
     }
     virtual public void ClearGameObject () {
@@ -90,8 +93,8 @@ public class PMEGround : PlacedMapEntity {
 
     }
 
-    float Perlin (Vector2 position, float scale, float factor = 1f, float valueOffset = 0f, float valueGain = 1f) {
-        float pn = ( Mathf.PerlinNoise(position.x * scale, position.y * scale) + valueOffset ) * valueGain;
+    float Perlin (Vector2 centerPosition, float scale, float factor = 1f, float valueOffset = 0f, float valueGain = 1f) {
+        float pn = ( Mathf.PerlinNoise(centerPosition.x * scale, centerPosition.y * scale) + valueOffset ) * valueGain;
         return Mathf.Clamp(pn, 0f, 1f) * factor;
     }
 
@@ -144,6 +147,32 @@ public class PMEGround : PlacedMapEntity {
         size = new Vector3(MapRenderer.scale, y * MapRenderer.scale, MapRenderer.scale);
     }
 
+    public override void AverageChildren () {
+        float sumGroundLevel = 0;
+        float sumWaterLevel = 0;
+        int c = 0;
+
+        foreach (PlacedMapEntity pme in children) {
+            if (pme is PMEGround) {
+                sumGroundLevel += ( (PMEGround)pme ).groundLevel;
+                sumWaterLevel += ( (PMEGround)pme ).waterLevel;
+                ++c;
+            }
+        }
+
+        groundLevel = sumGroundLevel / c;
+        waterLevel = sumWaterLevel / c;
+    }
+
+    public float groundLevel {
+        get {
+            return size.y;
+        }
+        set {
+            size.y = value;
+        }
+    }
+
     public override void Render (Vector3Int globalLoc, Vector3Int center) {
         if (isRendering) return;
         base.Render(globalLoc, center);
@@ -169,7 +198,7 @@ public class PMEGround : PlacedMapEntity {
             //
             //  active
             //
-            float h = size.y;
+            float h = groundLevel;
             float LODOffset = LODScale * 0.5f;
             if (h > waterLevel) {
                 //  above water

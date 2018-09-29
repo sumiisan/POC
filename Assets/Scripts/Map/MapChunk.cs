@@ -4,22 +4,22 @@ using System.Collections.Generic;
 
 public class MapChunk {
 
-    public static int horizontalSize = 32;
-    public static int verticalSize = 256;
+    public const int horizontalSize = 32;
+    public const int verticalSize = 256;
 
     public Vector2Int location;
-    List<PlacedMapEntity> data;
+    PlacedMapEntity lodTree;
+    PlacedMapEntity[,] data = new PlacedMapEntity[horizontalSize, horizontalSize];
 
     public MapChunk (Vector2Int location) {
         this.location = location;
     }
 
     public void Generate () {
-        data = new List<PlacedMapEntity>();
-        GeneratePlane(new Vector2Int(0, 0), GlobalLocation());
+        GenerateMap(GlobalPosition());
     }
 
-    Vector3Int GlobalLocation (int offsetX = 0, int offsetY = 0, int offsetZ = 0) {
+    Vector3Int GlobalPosition (int offsetX = 0, int offsetY = 0, int offsetZ = 0) {
         return new Vector3Int(location.x * horizontalSize + offsetX, offsetY, location.y * horizontalSize + offsetZ);
     }
 
@@ -33,40 +33,51 @@ public class MapChunk {
         return visibleRect.Intersects(area);
     }
 
-    void GeneratePlane (Vector2Int localPos, Vector3Int globalPos, int level = 0, PlacedMapEntity basePME = null) {
-        int LODScale = (int)( horizontalSize / Mathf.Pow(2, level) ); //32/1=32, 32/2=16, 32/4=8, 32/8=4, 32/16=2
-
-        PlacedMapEntity pme = MapEntityFactory.shared.Generate(MapEntityType.ground, new Vector3(localPos.x, 0, localPos.y), LODScale);
-
-        pme.Construct(globalPos, "");
-        if (basePME == null) {
-            data.Add(pme);
-        } else {
-            basePME.children[localPos.y * 2 + localPos.x] = pme;
+    void GenerateMap (Vector3Int globalPos) {
+        //  first create the raw (smallest size) ground data
+        for (int z = 0; z < horizontalSize; ++z) {
+            for (int x = 0; x < horizontalSize; ++x) {
+                PlacedMapEntity pme = MapEntityFactory.shared.Generate(MapEntityType.ground, new Vector3(x, 0, z), 1);
+                pme.Construct(new Vector3Int(globalPos.x + x, 0, globalPos.z + z), "");
+                data[x, z] = pme;
+            }
         }
 
+        //  make lod tree
+        lodTree = GenerateLODNode(new Vector2Int(0, 0), globalPos);
+    }
+
+    PlacedMapEntity GenerateLODNode (Vector2Int localPos, Vector3Int globalPos, int level = 0) {
+        int LODScale = (int)( horizontalSize / Mathf.Pow(2, level) ); //(L0)32/1=32, (L1)32/2=16, (L2)32/4=8, (L3)32/8=4, (L4)32/16=2, (L5)32/32=1
+        PlacedMapEntity pmeNode = MapEntityFactory.shared.Generate(MapEntityType.ground, new Vector3(localPos.x, 0, localPos.y), LODScale);
+
+        //  first dive down until bottom level recursively to grab the detail data
         if (level < 5) {
             for (int z = 0; z < 2; ++z) {
                 for (int x = 0; x < 2; ++x) {
                     int childLODScale = (int)LODScale / 2;
                     Vector3Int childGlobalPos = globalPos + new Vector3Int(x * childLODScale, 0, z * childLODScale);
-                    GeneratePlane(new Vector2Int(x, z), childGlobalPos, level + 1, pme);  //  recursive
+                    PlacedMapEntity childNode = GenerateLODNode(new Vector2Int(x, z), childGlobalPos, level + 1);  //  recursive
+                    pmeNode.children[z * 2 + x] = childNode;
                 }
             }
-
+            pmeNode.AverageChildren();
+            return pmeNode;
+        } else {
+            //  we are on level 5 (detail)
+            //            Debug.Log("x:" + globalPos.x + "  y:" + globalPos.z);
+            Vector3Int p = GlobalPosition();
+            return data[globalPos.x - p.x, globalPos.z - p.z];
         }
     }
 
+
     public void Render (Vector3Int center) {
-        foreach (PlacedMapEntity pme in data) {
-            pme.Render(GlobalLocation(), center);
-        }
+        lodTree.Render(GlobalPosition(), center);
     }
 
     public void Release () {
-        foreach (PlacedMapEntity pme in data) {
-            pme.Release();
-        }
-        data.Clear();
+        lodTree.Release();
+        lodTree = null;
     }
 }
