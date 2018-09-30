@@ -39,8 +39,23 @@ public class MapEntity {
 public class PlacedMapEntity : MapEntity, MapCodable, MapPlacable, MapConstructable {
     public Vector3 position = Vector3.zero;
     public Vector3 size = Vector3.one;
+
+    private static float[] LODList = new float[] { 32, 16, 8, 4, 2, 1 };
+
+    private int _LOD = 5;
+    public int LOD {
+        get {
+            return _LOD;
+        }
+        set {
+            _LOD = value;
+            LODScale = PlacedMapEntity.LODList[value];
+        }
+    }
+
     public float LODScale;
-    public PlacedMapEntity[] children = { null, null, null, null };
+    public PlacedMapEntity parent = null;
+    public PlacedMapEntity[] children = { null, null, null, null }; //  allow direct access to fast enumeration
     public string genom = "";
 
     protected bool isRendering = false;
@@ -54,17 +69,25 @@ public class PlacedMapEntity : MapEntity, MapCodable, MapPlacable, MapConstructa
             Mathf.Pow(44f, 2f) * 2f,//level 3 = 8x8
             Mathf.Pow(80f, 2f) * 2f,//level 4 = 16x16
             Mathf.Pow(200f, 2f) * 2f,//level 5 = 32x32
-    });
+        });
 
-
-    public PlacedMapEntity (MapEntityType type, Vector3 position, float LODScale) {
+    public PlacedMapEntity (MapEntityType type, Vector3 position, int LOD) {
         this.position = position;
         this.type = type;
-        this.LODScale = LODScale;
+        this.LOD = LOD;
     }
 
     protected Vector3 WorldPosition (Vector3Int chunkPosition) {
         return new Vector3(position.x * LODScale + chunkPosition.x, position.y * LODScale + chunkPosition.y, position.z * LODScale + chunkPosition.z);
+    }
+
+    public void AddChild (int x, int z, PlacedMapEntity c) {
+        children[z * 2 + x] = c;
+        c.parent = this;
+    }
+
+    public PlacedMapEntity ChildAt (int x, int z) {
+        return children[z * 2 + x];
     }
 
     virtual public void Construct (Vector3Int chunkPosition, string genom) {
@@ -87,9 +110,56 @@ public enum BiomeType {
 
 public class PMEGround : PlacedMapEntity {
     GameObject groundObject;
+    Color baseColor = Color.magenta;
     float waterLevel = 0;
 
-    public PMEGround (Vector3 position, float LODScale) : base(MapEntityType.ground, position, LODScale) {
+    public float groundLevel {
+        get {
+            return size.y;
+        }
+        set {
+            size.y = value;
+        }
+    }
+
+    private float _lightLevel = 0;
+    public float lightLevel {
+        get {
+            return _lightLevel;
+        }
+        set {
+            _lightLevel = value;
+            if (groundObject != null) {
+                MapEntityFactory.shared.SetColor(groundObject, baseColor, Mathf.Clamp(_lightLevel, 0.1f, 1f));
+            }
+        }
+    }
+
+    public void ReAdjustLightLevel (int baseLOD = -1) {
+        if (baseLOD == -1) baseLOD = LOD;   //  use my own
+
+        if (baseLOD >= LOD) {    // adjust parents
+            if (baseLOD > LOD) {
+                AverageChildren();
+            }
+            if (parent != null) {
+                ( (PMEGround)parent ).ReAdjustLightLevel(baseLOD);
+            }
+        }
+
+        if (baseLOD <= LOD) {    // adjust children
+            foreach (PlacedMapEntity pme in children) {
+                if (pme is PMEGround) {
+                    ( (PMEGround)pme ).lightLevel = lightLevel;
+                    ( (PMEGround)pme ).ReAdjustLightLevel(baseLOD);
+                }
+            }
+        }
+
+    }
+
+
+    public PMEGround (Vector3 position, int LOD) : base(MapEntityType.ground, position, LOD) {
 
     }
 
@@ -144,33 +214,29 @@ public class PMEGround : PlacedMapEntity {
             }
             break;
         }
-        size = new Vector3(MapRenderer.scale, y * MapRenderer.scale, MapRenderer.scale);
+        size = new Vector3(MapRenderer.scale, 0f, MapRenderer.scale);
+        groundLevel = y * MapRenderer.scale;
     }
 
     public override void AverageChildren () {
         float sumGroundLevel = 0;
         float sumWaterLevel = 0;
+        float sumLightLevel = 0;
         int c = 0;
 
         foreach (PlacedMapEntity pme in children) {
             if (pme is PMEGround) {
-                sumGroundLevel += ( (PMEGround)pme ).groundLevel;
-                sumWaterLevel += ( (PMEGround)pme ).waterLevel;
+                PMEGround pmeg = (PMEGround)pme;
+                sumGroundLevel += pmeg.groundLevel;
+                sumWaterLevel += pmeg.waterLevel;
+                sumLightLevel += pmeg.lightLevel;
                 ++c;
             }
         }
 
         groundLevel = sumGroundLevel / c;
         waterLevel = sumWaterLevel / c;
-    }
-
-    public float groundLevel {
-        get {
-            return size.y;
-        }
-        set {
-            size.y = value;
-        }
+        lightLevel = sumLightLevel / c;
     }
 
     public override void Render (Vector3Int globalLoc, Vector3Int center) {
@@ -200,15 +266,15 @@ public class PMEGround : PlacedMapEntity {
             //
             float h = groundLevel;
             float LODOffset = LODScale * 0.5f;
-            if (h > waterLevel) {
-                //  above water
+            if (h > waterLevel) { //  above water
                 if (groundObject == null) {
-                    groundObject = MapEntityFactory.Instantiate(MapEntityFactory.shared.groundPrefab);
+                    baseColor = Color.white;
+                    groundObject = NewMapObject(MapEntityFactory.shared.groundPrefab, baseColor).gameObject;
                 }
-            } else {
-                //  below water
+            } else { //  below water
                 if (groundObject == null) {
-                    groundObject = MapEntityFactory.Instantiate(MapEntityFactory.shared.oceanPrefab);
+                    baseColor = Color.blue;
+                    groundObject = NewMapObject(MapEntityFactory.shared.oceanPrefab, baseColor).gameObject;
                 }
                 h = waterLevel;
             }
@@ -230,7 +296,7 @@ public class PMEGround : PlacedMapEntity {
             }
             for (int z = 0; z < 2; ++z) {
                 for (int x = 0; x < 2; ++x) {
-                    PlacedMapEntity child = children[z * 2 + x];
+                    PlacedMapEntity child = ChildAt(x, z);
                     if (child != null) {
                         int childLODScale = (int)LODScale / 2;
                         child.Render(info.globalPosition + new Vector3Int(x * childLODScale, 0, z * childLODScale), center);
@@ -239,6 +305,14 @@ public class PMEGround : PlacedMapEntity {
             }
             //yield return null;
         }
+    }
+
+    private MapObject NewMapObject (GameObject prefab, Color color) {
+        GameObject o = MapEntityFactory.Instantiate(prefab);
+        MapEntityFactory.shared.SetColor(o, color, Mathf.Clamp(lightLevel, 0.1f, 1f));
+        MapObject mo = o.AddComponent<MapObject>();
+        mo.pme = this;
+        return mo;
     }
 
     public override void ClearGameObject () {

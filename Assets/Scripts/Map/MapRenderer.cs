@@ -1,6 +1,8 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UniRx;
 
 public class MapRenderer : MonoBehaviour {
 
@@ -26,6 +28,16 @@ public class MapRenderer : MonoBehaviour {
     void Start () {
         cameraPosition.transform.position = new Vector3(playerPosition.x, playerPosition.y, playerPosition.z);
         Render();
+
+        Observable.Return(Unit.Default)
+                  .Delay(TimeSpan.FromMilliseconds(5000))
+                  .Subscribe(_ => {
+                      mapData.PutLight(playerPosition, 1f);
+                      Render();
+                  });
+
+
+
     }
 
     // Update is called once per frame
